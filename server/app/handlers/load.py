@@ -179,8 +179,26 @@ def get_or_seed_blob(full_state: dict, viewer_id) -> dict:
         blob = state_store.load_lazy_key(viewer_id, STATE_KEY)
         if blob is None:
             blob = _neutralize_identity(_load_seed(), viewer_id)
+        _skip_tutorial_for_existing_client(blob, viewer_id)
         full_state[STATE_KEY] = blob
     return blob
+
+
+def _skip_tutorial_for_existing_client(blob: dict, viewer_id) -> None:
+    """A viewer that reaches us without a tool/signup here (no auth_key on
+    record) is a game install that already completed onboarding elsewhere --
+    e.g. a fresh UmaServer install in %LOCALAPPDATA% while the game keeps its
+    saved viewer_id. Seeding it with tutorial_step=0 sends that client into
+    the onboarding flow at boot, where it hangs on "Now Loading" after
+    load/index. Start such accounts with the tutorial already skipped."""
+    user_info = blob.setdefault("data", {}).setdefault("user_info", {})
+    if user_info.get("tutorial_step") not in (0, None):
+        return
+    from .. import accounts
+    account = accounts.get_account(viewer_id)
+    if account and account.get("auth_key"):
+        return
+    user_info["tutorial_step"] = 1000
 
 
 def _reload_state(viewer_id, previous: dict) -> dict:
@@ -290,6 +308,7 @@ def handle_load_index(payload: dict) -> dict:
     response = state_store.load_lazy_key(viewer_id, STATE_KEY)
     if response is None:
         response = copy.deepcopy(blob)
+    _skip_tutorial_for_existing_client(response, viewer_id)
 
     user_info = response.get("data", {}).get("user_info")
     if isinstance(user_info, dict) and "update_time" in user_info:
