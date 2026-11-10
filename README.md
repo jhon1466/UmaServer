@@ -9,7 +9,7 @@ Servidor privado de Umamusume: Pretty Derby para Windows, con administración de
 
 ## Inicio
 
-1. Descarga **UmaServer-Admin.exe** desde Releases y ábrelo.
+1. Descarga **UmaPS.exe** desde Releases y ábrelo.
 2. En **Servidor y juego**, selecciona la región y pulsa **Instalar y arrancar**. La primera ejecución descarga el servidor, instala sus dependencias y configura el acceso al juego.
 3. Abre **Panel de administración** para gestionar tu cuenta. Las ventanas se pueden abrir, mover y maximizar desde el menú lateral.
 4. Inicia el juego desde Steam o mediante el botón **Jugar Umamusume** de la aplicación.
