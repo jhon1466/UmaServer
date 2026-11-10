@@ -1,0 +1,189 @@
+/* Uma Musume inspired skin for the existing windowed admin desktop. */
+:root {
+  --bg-top: #183d63;
+  --bg-bottom: #071a31;
+  --glass: rgba(11, 31, 55, .94);
+  --glass-strong: rgba(10, 29, 51, .98);
+  --surface: rgba(154, 215, 235, .085);
+  --surface-hover: rgba(173, 231, 247, .16);
+  --border: rgba(154, 217, 239, .22);
+  --border-soft: rgba(193, 230, 244, .13);
+  --text: #f4f7ff;
+  --muted: #c0d6e9;
+  --faint: #8daec8;
+  --accent: #f5cf68;
+  --accent-soft: rgba(245, 207, 104, .16);
+  --accent-border: rgba(255, 224, 139, .62);
+  --ok: #7be0bd;
+  --warn: #ffc078;
+  --error: #ff8297;
+  --spectrum: linear-gradient(90deg, #5bd2e9, #85e6c5 46%, #f5cf68);
+  --track: #27445e;
+  --radius: 11px;
+  --dock: 188px;
+  color-scheme: dark;
+}
+
+body {
+  background:
+    radial-gradient(ellipse at 78% 8%, rgba(51, 142, 190, .35), transparent 42%),
+    linear-gradient(148deg, var(--bg-top), var(--bg-bottom) 74%);
+}
+
+#desktop::before {
+  inset: 0;
+  background-image:
+    linear-gradient(115deg, rgba(8, 25, 47, .56), rgba(8, 25, 47, .15) 58%, rgba(8, 25, 47, .4)),
+    radial-gradient(ellipse at 20% 85%, rgba(255, 125, 174, .13), transparent 42%),
+    url("game-ui/utx_bg_menu_00.png");
+  background-repeat: no-repeat;
+  background-size: cover, cover, 100% 100%;
+  background-position: center;
+  opacity: .88;
+}
+
+#wallpaper-hint b {
+  color: rgba(219, 242, 255, .36);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  text-shadow: 0 3px 18px rgba(55, 166, 209, .28);
+}
+
+#dock {
+  align-items: stretch;
+  padding: 10px 8px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: linear-gradient(180deg, rgba(10, 37, 64, .96), rgba(7, 25, 46, .96));
+  border-right: 1px solid rgba(136, 211, 239, .3);
+  box-shadow: 8px 0 24px rgba(3, 13, 28, .27);
+}
+
+#dock .logo {
+  align-self: center;
+  width: 36px;
+  height: 36px;
+  margin-bottom: 4px;
+  flex-shrink: 0;
+  border: 2px solid #f4d477;
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px rgba(244, 212, 119, .14), 0 6px 18px #06182a99;
+}
+
+.dock-btn {
+  width: 100%;
+  height: 34px;
+  display: flex;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 0 10px;
+  border-radius: 9px;
+  border-color: rgba(150, 219, 242, .12);
+  background: linear-gradient(145deg, rgba(172, 230, 247, .1), rgba(25, 67, 101, .28));
+  color: var(--text);
+}
+.dock-btn .dock-label { position: static; display:block; color:#f4f7ff; font-size:11px; font-weight:800; line-height:1.08; text-align:left; white-space:normal; }
+.dock-btn svg.i { width:18px; height:18px; flex:none; }
+.dock-btn .tip { display: none; }
+#dock-apps { display:grid; gap:3px; flex-shrink:0; }
+#dock-region, #dock-language { display:flex; justify-content:center; gap:4px; margin-bottom:4px; flex-shrink:0; }
+#dock-target, #dock .conn { align-self:center; }
+.dock-btn:hover { background: rgba(99, 206, 231, .22); border-color: rgba(130, 226, 244, .58); }
+.dock-btn.focused {
+  background: linear-gradient(145deg, rgba(245, 207, 104, .29), rgba(53, 140, 172, .28));
+  border-color: var(--accent-border);
+  box-shadow: inset 0 0 0 1px rgba(255, 232, 162, .16), 0 4px 14px rgba(0, 0, 0, .22);
+}
+.dock-btn.open::before, .dock-btn.focused::before { background: #72d9ec; }
+.dock-btn.focused::before { background: var(--accent); }
+.dock-btn .ui-game-art {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center 24%;
+  border: 1px solid rgba(245, 215, 137, .85);
+  background: #294b68;
+  box-shadow: 0 2px 8px #031426aa;
+}
+.dock-btn .ui-game-art.missing { display: none; }
+
+.win {
+  background: linear-gradient(150deg, rgba(18, 48, 76, .96), rgba(8, 28, 51, .96)), url("game-ui/utx_bg_menu_00.png") center / 100% 100%;
+  border: 1px solid rgba(134, 211, 239, .38);
+  border-radius: 11px;
+  box-shadow: 0 22px 65px rgba(1, 11, 24, .58), inset 0 1px 0 rgba(222, 246, 255, .1);
+}
+.win.focused {
+  border-color: rgba(246, 214, 125, .8);
+  box-shadow: 0 24px 72px rgba(1, 11, 24, .65), 0 0 0 1px rgba(246, 214, 125, .14), inset 0 1px 0 rgba(255, 244, 208, .12);
+}
+.titlebar {
+  height: 50px;
+  background: url("game-ui/utx_frm_window_hdr_00.png") center / 100% 100% no-repeat;
+  border-bottom-color: #468923;
+}
+.titlebar .title { color: #24421b; font-size: 15px; font-weight: 900; letter-spacing: .015em; }
+.titlebar .icon { color: inherit; }
+.titlebar .ui-game-art {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center 22%;
+  border: 1px solid var(--accent);
+  background: #244866;
+}
+
+.btn {
+  border-radius: 9px;
+  border-color: rgba(161, 222, 240, .34);
+  color: #384153;
+  border: 0;
+  background: url("game-ui/utx_btn_m_00_sl.png") center / 100% 100% no-repeat;
+  box-shadow: inset 0 1px 0 rgba(235, 250, 255, .12), 0 2px 5px rgba(0, 13, 31, .22);
+}
+.btn:hover { filter: brightness(1.08); }
+.btn.primary {
+  color: #173b13;
+  border: 0;
+  background: url("game-ui/utx_btn_m_01_sl.png") center / 100% 100% no-repeat;
+  box-shadow: 0 3px 9px rgba(45, 93, 30, .25);
+  font-weight: 800;
+}
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.primary svg.i { color: #22516d; }
+.btn.danger, .btn.icon-btn.danger:hover { color: #a51f3b; }
+
+input[type=text], input[type=password], input[type=number], select, textarea.code {
+  border-color: rgba(142, 205, 232, .29);
+  border-radius: 8px;
+  color: #f2f7ff;
+  background-color: rgba(4, 21, 41, .63);
+}
+input:focus, select:focus, textarea.code:focus { border-color: #67d8eb; box-shadow: 0 0 0 2px rgba(83, 205, 229, .14); }
+select option { background: #102b47; }
+label.check input { accent-color: #62d7e8; }
+
+.tile, .acct, .energy, .rw-card, .ctile, .veteran-card, .race-card, .support-card {
+  border-color: rgba(149, 211, 235, .2);
+  background: linear-gradient(145deg, rgba(150, 218, 238, .09), rgba(28, 66, 99, .17));
+}
+.ctile:hover, .ctile.on { border-color: rgba(245, 207, 104, .72); background: rgba(245, 207, 104, .12); }
+.ct-badge, .ct-own { background: rgba(7, 28, 49, .91); }
+.ct-own { color: #f5d77f; }
+.tag { color: #14314a; }
+.apt.g8 { color: #ffe180; background: rgba(255, 213, 102, .17); }
+.apt.g7 { color: #ff9fca; background: rgba(255, 130, 185, .14); }
+.rar-3 { background: linear-gradient(90deg, rgba(98, 210, 235, .3), rgba(245, 207, 104, .3), rgba(255, 133, 180, .3)); }
+.stars { color: #ffdc78; text-shadow: 0 1px 5px rgba(245, 185, 61, .35); }
+
+.titlebar .wbtn { color: #24421b; }
+.titlebar .wbtn:hover { color: #173b13; background: rgba(255, 255, 255, .3); }
+.titlebar .wbtn.close:hover { color: #fff; background: rgba(255, 111, 145, .32); }
+.tip, .toast, .modal, .menu-pop { border-color: rgba(145, 213, 237, .27); }
+.toast { background: linear-gradient(145deg, #173f5e, #0b2947); }
+
+@media (max-width: 760px) {
+  :root { --dock: 158px; }
+}
