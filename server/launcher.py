@@ -323,7 +323,33 @@ def setup_game(region: str, info: dict) -> None:
         else:
             say("  note: Global isn't installed, so JP career events match on Japanese text only.")
     ensure_race_assets(region, game / info["data"] / "Persistent")
+    reset_game_login_for_new_server(region, game / info["data"] / "Persistent")
     setup_hachimi_redirect(region, info, game)
+
+
+def reset_game_login_for_new_server(region: str, persistent: Path) -> None:
+    """A brand-new server (no accounts database yet) does not know the
+    viewer_id the game has saved from another server. Logging in with it skips
+    tool/signup and the game hangs on "Now Loading" in the onboarding flow.
+    Moving the game's login save aside makes it sign up as a new player (name
+    entry included). It is kept as SaveData.db.bak, never deleted, and only
+    done once per server install."""
+    data_dir = SERVER / "data" / ("jp" if region == "jp" else "")
+    marker = data_dir / ".game_login_reset"
+    if (data_dir / "accounts.sqlite3").exists() or marker.exists():
+        return
+    save = persistent / "d" / "SaveData.db"
+    try:
+        if save.is_file():
+            backup = save.with_name("SaveData.db.bak")
+            if backup.exists():
+                backup.unlink()
+            save.rename(backup)
+            say(f"  game login reset for this new server (backup: {backup})")
+        data_dir.mkdir(parents=True, exist_ok=True)
+        marker.write_text("1", encoding="utf-8")
+    except OSError as e:
+        say(f"  warning: could not reset the game login ({e}); close the game and run setup again.")
 
 
 HACHIMI_RELEASE_URL = "https://github.com/kairusds/Hachimi-Edge/releases/latest/download/hachimi.dll"
