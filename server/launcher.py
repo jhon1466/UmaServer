@@ -39,7 +39,8 @@ ROOT = SERVER.parent
 VENV = SERVER / ".venv"
 WINDOWS = os.name == "nt"
 MAC = sys.platform == "darwin"
-VENV_PY = VENV / ("Scripts/python.exe" if WINDOWS else "bin/python")
+PORTABLE_PYTHON = os.environ.get("UMASERVER_PORTABLE_PYTHON") == "1" or any(Path(sys.executable).parent.glob("*._pth"))
+VENV_PY = Path(sys.executable) if PORTABLE_PYTHON else VENV / ("Scripts/python.exe" if WINDOWS else "bin/python")
 MIN_PY = (3, 11)
 
 # Unprivileged ports on loopback: no root/admin, no setcap. The plugin is told
@@ -90,6 +91,16 @@ def ensure_venv(reset: bool) -> None:
     step("Python environment")
     if sys.version_info < MIN_PY:
         die(f"Python {MIN_PY[0]}.{MIN_PY[1]}+ is required (this is {platform.python_version()}).")
+    if PORTABLE_PYTHON:
+        req = SERVER / "requirements.txt"
+        stamp = SERVER / ".portable-requirements.sha256"
+        digest = hashlib.sha256(req.read_bytes()).hexdigest()
+        if not stamp.exists() or stamp.read_text().strip() != digest:
+            run([sys.executable, "-m", "pip", "install", "--disable-pip-version-check",
+                 "--no-warn-script-location", "--only-binary=:all:", "--find-links", ROOT / "runtime", "-r", req])
+            stamp.write_text(digest)
+        say("  ok")
+        return
     if reset and VENV.exists():
         shutil.rmtree(VENV)
     if not VENV_PY.exists():
@@ -106,6 +117,8 @@ def ensure_venv(reset: bool) -> None:
 
 
 def in_venv() -> bool:
+    if PORTABLE_PYTHON:
+        return True
     try:
         return Path(sys.prefix).resolve() == VENV.resolve()
     except OSError:
@@ -194,31 +207,16 @@ def newest_mtime(paths: list[Path]) -> float:
 
 def ensure_engines() -> None:
     step("Race engines (Rust)")
-    cargo = find_cargo()
-    if not cargo:
-        say("  Rust is not installed. The race simulator is written in Rust and has to be")
-        say("  built once on this machine (a few minutes).")
-        if not ask("  Install Rust now via rustup (https://rustup.rs)?"):
-            die("Rust is required. Install it from https://rustup.rs and re-run this launcher.")
-        install_rust()
-        cargo = find_cargo()
-        if not cargo:
-            die("Rust was installed but cargo isn't found. Open a new terminal and re-run.")
     for crate in ("race_exact_rs", "race_engine_rs"):
-        root = SERVER / crate
-        binary = root / "target" / "release" / (crate + (".exe" if WINDOWS else ""))
-        sources = [root / "src", root / "Cargo.toml", root / "Cargo.lock"]
-        if binary.exists() and binary.stat().st_mtime >= newest_mtime(sources):
-            say(f"  {crate}: up to date")
-            continue
-        say(f"  building {crate} ...")
-        cmd = [cargo, "build", "--release", "--quiet", "--manifest-path", root / "Cargo.toml",
-               "--target-dir", root / "target"]
-        if (root / "Cargo.lock").exists():
-            cmd.insert(3, "--locked")
-        # Compiler warnings are developer noise for someone just running the server.
-        run(cmd, env=dict(os.environ, RUSTFLAGS="-Awarnings"))
-        binary.touch()  # cargo skips relinking an unchanged crate; mark it fresh
+        binary = SERVER / crate / "target" / "release" / (crate + (".exe" if WINDOWS else ""))
+        if not binary.is_file():
+            fallback = ROOT / "runtime" / (crate + (".exe" if WINDOWS else ""))
+            if fallback.is_file():
+                binary.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(fallback, binary)
+        if not binary.is_file():
+            die(f"Falta el motor precompilado {crate}. Vuelve a ejecutar la instalación desde UmaPS Admin.")
+        say(f"  {crate}: up to date")
 
 
 # --- 4. game install, master.mdb, Hachimi plugin ---------------------------------
@@ -331,10 +329,11 @@ def setup_game(region: str, info: dict) -> None:
 HACHIMI_RELEASE_URL = "https://github.com/kairusds/Hachimi-Edge/releases/latest/download/hachimi.dll"
 
 
-def ensure_redirect_plugin(cargo: str | None) -> Path | None:
+def ensure_redirect_plugin(cargo: str | None = None) -> Path | None:
     plugin_dir = ROOT / "plugin" / "hachimi_redirect"
     candidates = [
         plugin_dir / "hachimi_redirect.dll",
+        ROOT / "runtime" / "hachimi_redirect.dll",
         plugin_dir / "target" / "release" / "hachimi_redirect.dll",
         plugin_dir / "target" / "x86_64-pc-windows-msvc" / "release" / "hachimi_redirect.dll",
         plugin_dir / "target" / "x86_64-pc-windows-gnu" / "release" / "hachimi_redirect.dll",
@@ -343,25 +342,7 @@ def ensure_redirect_plugin(cargo: str | None) -> Path | None:
         if c.is_file():
             return c
 
-    if not cargo:
-        cargo = find_cargo()
-    if not cargo:
-        say("  warning: cargo not found to compile hachimi_redirect.dll")
-        return None
-
-    say("  building hachimi_redirect.dll ...")
-    cmd = [cargo, "build", "--release", "--manifest-path", str(plugin_dir / "Cargo.toml")]
-    try:
-        run(cmd, env=dict(os.environ, RUSTFLAGS="-Awarnings"))
-    except subprocess.CalledProcessError:
-        # Fallback to explicit msvc if host is msvc
-        cmd_msvc = [cargo, "build", "--release", "--target", "x86_64-pc-windows-msvc",
-                    "--manifest-path", str(plugin_dir / "Cargo.toml")]
-        run(cmd_msvc, env=dict(os.environ, RUSTFLAGS="-Awarnings"))
-
-    for c in candidates:
-        if c.is_file():
-            return c
+    say("  aviso: hachimi_redirect.dll no encontrado en runtime/ ni plugin/.")
     return None
 
 
@@ -525,6 +506,8 @@ def main() -> None:
         os.environ["UMA_GAME_DIR"] = str(Path(args.game_dir).expanduser().resolve())
     info = REGIONS[args.region]
 
+    if PORTABLE_PYTHON:
+        ensure_venv(False)
     if not in_venv():
         ensure_venv(args.reset_venv)
         env = dict(os.environ, UMAPS_LAUNCHER_STAGE2="1")

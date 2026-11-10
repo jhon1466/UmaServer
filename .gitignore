@@ -1,9 +1,11 @@
 # Entornos, compilaciones y archivos locales
+UmaPS.exe
 __pycache__/
 *.py[cod]
 .venv/
 server/.venv/
 node_modules/
+server/.portable-requirements.sha256
 dist/
 .astro/
 target/
@@ -19,16 +21,10 @@ server/admin_ui/cache/
 server/admin_ui/logs/
 server/data/custom_support/packs/
 server/data/jp/custom_support/packs/
-server/data/seeds/
-server/data/jp/seeds/
-server/data/jp/server_key.json
-server/data/jp/build_tail20.json
-server/data/jp/response_schema.json
 server/data/jp/save_backups/
 server/data/race_param_define*.json
 plugin/hachimi_redirect/*.dll
 /jp_captures/
-server/fixtures/
 captures/
 debug_responses/
 logs/

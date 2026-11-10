@@ -21,14 +21,14 @@ export default function TracenApp() {
       </div>
       <span class={`desktop-connection ${connected() ? 'online' : ''}`}><i />{connected() ? 'Panel conectado' : 'Panel desconectado'}</span>
     </header>
-    <Show when={view() === 'admin'}>
+    <div class={`desktop-view-admin ${view() === 'admin' ? '' : 'desktop-view-hidden'}`}>
       <Show when={connected()} fallback={<div class="desktop-offline"><h1>Panel de administración</h1><p>Inicia el servidor para cargar las cuentas y herramientas.</p><button class="desktop-tab selected" onClick={() => setView('server')}>Abrir servidor y juego</button></div>}>
         <iframe title="Panel de administración de UmaPS" class="desktop-frame" src={`${serverUrl()}/`} />
       </Show>
-    </Show>
-    <Show when={view() === 'server'}>
+    </div>
+    <div class={`desktop-view-server ${view() === 'server' ? '' : 'desktop-view-hidden'}`}>
       <main class="desktop-server"><ServerPanel language={language()} onStarted={() => { void refreshAll(); setView('admin'); }} /></main>
-    </Show>
+    </div>
     <Show when={notice()}>{n => <div class={`toast ${n().error ? 'toast-error' : ''}`}>{n().text}</div>}</Show>
   </div>;
 }

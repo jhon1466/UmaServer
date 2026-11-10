@@ -8,3 +8,4 @@ Pillow
 tzdata
 UnityPy==1.25.4
 apsw-sqlite3mc==3.53.4.0
+tpk_ar==0.2.4

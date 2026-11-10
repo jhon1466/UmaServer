@@ -75,7 +75,7 @@ pub fn repo_root() -> PathBuf {
     }
     std::env::var_os("LOCALAPPDATA")
         .map(|p| PathBuf::from(p).join("UmaServer").join("project"))
-        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
+        .unwrap_or_else(|| PathBuf::from("."))
 }
 
 fn ensure_project(root: &Path, app: &AppHandle) -> Result<(), String> {
@@ -86,10 +86,18 @@ fn ensure_project(root: &Path, app: &AppHandle) -> Result<(), String> {
     #[cfg(windows)]
     {
         let script = r#"$ErrorActionPreference='Stop'
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
+function Download-File($url, $dest) {
+  if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
+    & curl.exe -f -s -S -L -o $dest $url
+    if ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $dest -PathType Leaf)) { return }
+  }
+  Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $dest -UserAgent 'Mozilla/5.0'
+}
 $tempDir = Join-Path $env:TEMP ('umaserver-install-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $tempDir | Out-Null
 $archive = Join-Path $tempDir 'project.zip'
-Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/jhon1466/UmaServer/archive/refs/heads/main.zip' -OutFile $archive
+Download-File 'https://github.com/jhon1466/UmaServer/archive/refs/heads/main.zip' $archive
 Expand-Archive -LiteralPath $archive -DestinationPath $tempDir
 $source = Join-Path $tempDir 'UmaServer-main'
 if (!(Test-Path -LiteralPath (Join-Path $source 'server/launcher.py'))) { throw 'El archivo descargado no contiene el servidor.' }
@@ -113,6 +121,105 @@ if ($resolvedTemp.StartsWith($tempRoot, [StringComparison]::OrdinalIgnoreCase)) 
     }
     #[cfg(not(windows))]
     Err("Coloca la aplicación dentro de la carpeta del proyecto.".into())
+}
+
+fn portable_python() -> PathBuf {
+    std::env::var_os("LOCALAPPDATA")
+        .map(|p| PathBuf::from(p).join("UmaServer").join("python313").join("python.exe"))
+        .unwrap_or_else(|| repo_root().join("runtime").join("python313").join("python.exe"))
+}
+
+fn ensure_runtime(root: &Path, app: &AppHandle) -> Result<(), String> {
+    progress(app, "setup", 7.0, "Preparando los componentes del servidor…");
+    let copies = [
+        ("runtime/race_exact_rs.exe", "server/race_exact_rs/target/release/race_exact_rs.exe"),
+        ("runtime/race_engine_rs.exe", "server/race_engine_rs/target/release/race_engine_rs.exe"),
+        ("runtime/hachimi_redirect.dll", "plugin/hachimi_redirect/hachimi_redirect.dll"),
+    ];
+    for (src_rel, dst_rel) in copies {
+        let src = root.join(src_rel);
+        let dst = root.join(dst_rel);
+        if src.is_file() {
+            if let Some(parent) = dst.parent() {
+                let _ = fs::create_dir_all(parent);
+            }
+            let _ = fs::copy(&src, &dst);
+        }
+    }
+
+    let required = [
+        "server/race_exact_rs/target/release/race_exact_rs.exe",
+        "server/race_engine_rs/target/release/race_engine_rs.exe",
+        "plugin/hachimi_redirect/hachimi_redirect.dll",
+        "runtime/pip-25.0.1-py3-none-any.whl",
+        "runtime/tpk_ar-0.2.4-py3-none-any.whl",
+    ];
+    if !required.iter().all(|p| root.join(p).is_file()) {
+        return Err("Faltan componentes en los archivos del servidor.".into());
+    }
+    Ok(())
+}
+
+fn configure_portable_paths(root: &Path) -> Result<(), String> {
+    let home = portable_python().parent().ok_or("No se encontró la carpeta del entorno.")?.to_path_buf();
+    let paths = format!("python313.zip\n.\nLib\\site-packages\n{}\n{}\nimport site\n", root.display(), root.join("server").display());
+    fs::write(home.join("python313._pth"), paths).map_err(|e| format!("No se pudo configurar el entorno: {e}"))
+}
+
+fn ensure_python(root: &Path, app: &AppHandle) -> Result<PathBuf, String> {
+    let venv = root.join("server/.venv/Scripts/python.exe");
+    if venv.is_file() {
+        let ok = hidden(Command::new(&venv).args(["-c", "import sys; assert (3,11) <= sys.version_info[:2] < (3,15)"])).status().is_ok_and(|s| s.success());
+        if ok { return Ok(venv); }
+    }
+    let python = portable_python();
+    if python.is_file() {
+        configure_portable_paths(root)?;
+        if hidden(Command::new(&python).args(["-m", "pip", "--version"])).status().is_ok_and(|s| s.success()) { return Ok(python); }
+    }
+    progress(app, "venv", 12.0, "Preparando el entorno privado del servidor…");
+    #[cfg(windows)]
+    {
+        let home = python.parent().ok_or("No se encontró la carpeta del entorno.")?;
+        let script = r#"$ErrorActionPreference='Stop'
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
+function Download-File($url, $dest) {
+  if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
+    & curl.exe -f -s -S -L -o $dest $url
+    if ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $dest -PathType Leaf)) { return }
+  }
+  Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $dest -UserAgent 'Mozilla/5.0'
+}
+$tempDir=Join-Path $env:TEMP ('umaserver-python-'+[guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $tempDir | Out-Null
+$archive=Join-Path $tempDir 'python.zip'
+Download-File 'https://www.python.org/ftp/python/3.13.2/python-3.13.2-embed-amd64.zip' $archive
+if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ne '1E803610B140CBF69DFA2CEAAEB39651BEF75A239C381289E827C30862A27B93') { throw 'La descarga del entorno no coincide con la versión esperada.' }
+New-Item -ItemType Directory -Path $env:UMASERVER_PYTHON -Force | Out-Null
+Expand-Archive -LiteralPath $archive -DestinationPath $env:UMASERVER_PYTHON -Force
+$pipArchive=Join-Path $tempDir 'pip.zip'
+Copy-Item -LiteralPath (Join-Path $env:UMASERVER_PROJECT 'runtime/pip-25.0.1-py3-none-any.whl') -Destination $pipArchive
+$site=Join-Path $env:UMASERVER_PYTHON 'Lib/site-packages'
+New-Item -ItemType Directory -Path $site -Force | Out-Null
+Expand-Archive -LiteralPath $pipArchive -DestinationPath $site -Force
+$resolved=(Resolve-Path -LiteralPath $tempDir).Path; $tempRoot=[IO.Path]::GetFullPath($env:TEMP).TrimEnd('\')+'\'
+if ($resolved.StartsWith($tempRoot,[StringComparison]::OrdinalIgnoreCase)) { Remove-Item -LiteralPath $resolved -Recurse -Force }
+"#;
+        let output = hidden(Command::new("powershell.exe").args(["-NoProfile", "-NonInteractive", "-Command", script]).env("UMASERVER_PYTHON", home).env("UMASERVER_PROJECT", root))
+            .output().map_err(|e| format!("No se pudo preparar el entorno: {e}"))?;
+        if !output.status.success() { return Err(format!("No se pudo preparar el entorno: {}", String::from_utf8_lossy(&output.stderr).trim())); }
+        configure_portable_paths(root)?;
+        let check = hidden(Command::new(&python).args(["-m", "pip", "--version"])).output().map_err(|e| format!("No se pudo iniciar el entorno: {e}"))?;
+        if !check.status.success() { return Err(format!("El entorno no pudo iniciarse: {}", String::from_utf8_lossy(&check.stderr).trim())); }
+        return Ok(python);
+    }
+    #[cfg(not(windows))]
+    Err("La instalación automática está disponible para Windows.".into())
+}
+
+fn configure_runtime_env(cmd: &mut Command, py: &Path) {
+    cmd.env("UMASERVER_USE_PREBUILT", "1").env("PYTHONUNBUFFERED", "1");
+    if py == portable_python() { cmd.env("UMASERVER_PORTABLE_PYTHON", "1"); }
 }
 
 fn settings_path() -> PathBuf {
@@ -211,22 +318,8 @@ fn find_python(root: &Path) -> Option<PathBuf> {
     if venv_py.exists() {
         return Some(venv_py);
     }
-    if let Some(local) = std::env::var_os("LOCALAPPDATA") {
-        let programs = PathBuf::from(local).join("Programs").join("Python");
-        for ver in ["Python314", "Python313", "Python312", "Python311"] {
-            let candidate = programs.join(ver).join("python.exe");
-            if candidate.exists() {
-                return Some(candidate);
-            }
-        }
-    }
-    for cmd in ["python", "python3"] {
-        if let Ok(out) = hidden(Command::new(cmd).arg("--version")).output() {
-            if out.status.success() {
-                return Some(PathBuf::from(cmd));
-            }
-        }
-    }
+    let portable = portable_python();
+    if portable.is_file() { return Some(portable); }
     None
 }
 
@@ -280,7 +373,7 @@ pub fn compute_status(m: &Manager) -> Status {
         .join(".venv")
         .join("Scripts")
         .join("python.exe")
-        .exists();
+        .exists() || (portable_python().is_file() && root.join("server/.portable-requirements.sha256").is_file());
     let cert_name = if settings.region == "jp" { "jp" } else { "server" };
     let cert_ready = root
         .join("server")
@@ -339,10 +432,9 @@ pub fn compute_status(m: &Manager) -> Status {
 fn run_setup_sync(app: &AppHandle) -> Result<(), String> {
     let root = repo_root();
     ensure_project(&root, app)?;
+    ensure_runtime(&root, app)?;
     let settings = load_settings();
-    let py = find_python(&root).ok_or_else(|| {
-        "No se encontró Python 3.11+ en el sistema. Instala Python desde python.org.".to_string()
-    })?;
+    let py = ensure_python(&root, app)?;
 
     progress(
         app,
@@ -366,6 +458,8 @@ fn run_setup_sync(app: &AppHandle) -> Result<(), String> {
             cmd.arg("--game-dir").arg(gdir.trim());
         }
     }
+
+    configure_runtime_env(&mut cmd, &py);
 
     cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
 
@@ -578,6 +672,8 @@ pub async fn manager_start(app: AppHandle, m: State<'_, Manager>) -> Result<Stri
             .arg(&settings.region)
             .arg("--yes")
             .arg("--no-browser");
+
+        configure_runtime_env(&mut cmd, &py);
 
         if let Some(ref gdir) = settings.game_dir {
             if !gdir.trim().is_empty() {
