@@ -78,11 +78,68 @@ pub fn repo_root() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from("."))
 }
 
+const VERSION_MARKER: &str = ".umaserver-commit";
+
+fn managed_root() -> Option<PathBuf> {
+    std::env::var_os("LOCALAPPDATA").map(|p| PathBuf::from(p).join("UmaServer").join("project"))
+}
+
+/// Último commit de `main` en GitHub, o None si no hay conexión.
+fn latest_remote_commit() -> Option<String> {
+    #[cfg(windows)]
+    {
+        let script = r#"$ErrorActionPreference='Stop'
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
+(Invoke-RestMethod -UseBasicParsing -TimeoutSec 15 -Headers @{ 'User-Agent'='UmaServer-Admin'; 'Accept'='application/vnd.github+json' } -Uri 'https://api.github.com/repos/jhon1466/UmaServer/commits/main').sha
+"#;
+        let out = hidden(Command::new("powershell.exe").args(["-NoProfile", "-NonInteractive", "-Command", script]))
+            .output()
+            .ok()?;
+        let sha = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        if out.status.success() && sha.len() == 40 && sha.chars().all(|c| c.is_ascii_hexdigit()) {
+            return Some(sha);
+        }
+    }
+    None
+}
+
 fn ensure_project(root: &Path, app: &AppHandle) -> Result<(), String> {
-    if root.join("server").join("launcher.py").is_file() {
+    let installed = root.join("server").join("launcher.py").is_file();
+    // Solo la copia gestionada en %LOCALAPPDATA% se actualiza sola; una carpeta de
+    // desarrollo (el exe dentro del repositorio) nunca se sobrescribe.
+    let managed = managed_root().is_some_and(|m| m == root);
+    let target_commit;
+    if installed {
+        if !managed {
+            return Ok(());
+        }
+        let Some(remote) = latest_remote_commit() else { return Ok(()) };
+        let local = fs::read_to_string(root.join(VERSION_MARKER)).unwrap_or_default();
+        if local.trim() == remote {
+            return Ok(());
+        }
+        progress(app, "setup", 3.0, "Actualizando los archivos del servidor…");
+        target_commit = Some(remote);
+    } else {
+        progress(app, "setup", 3.0, "Descargando los archivos del servidor…");
+        target_commit = latest_remote_commit();
+    }
+    let result = download_project(root);
+    if result.is_ok() {
+        if let Some(sha) = target_commit {
+            let _ = fs::write(root.join(VERSION_MARKER), sha);
+        }
+    } else if installed {
+        // Sin actualización seguimos con la copia existente.
+        if let Err(ref e) = result {
+            append_log(&format!("[setup] No se pudo actualizar el servidor: {e}"));
+        }
         return Ok(());
     }
-    progress(app, "setup", 3.0, "Descargando los archivos del servidor…");
+    result
+}
+
+fn download_project(root: &Path) -> Result<(), String> {
     #[cfg(windows)]
     {
         let script = r#"$ErrorActionPreference='Stop'

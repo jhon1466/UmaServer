@@ -25,7 +25,7 @@ server/data/jp/save_backups/
 server/data/race_param_define*.json
 plugin/hachimi_redirect/*.dll
 /jp_captures/
-captures/
+/captures/
 debug_responses/
 logs/
 *.pcap
