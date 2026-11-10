@@ -409,8 +409,17 @@ def setup_hachimi_redirect(region: str, info: dict, game: Path) -> None:
 
     # 5. Configure redirect.cfg in hachimi/ and in game folder
     target_server = f"https://127.0.0.1:{info['port']}"
-    cfg_content = f"enabled=true\nserver={target_server}\n"
     for target_cfg in [hachimi_dir / "redirect.cfg", game / "redirect.cfg"]:
+        # Keep the plugin's other options (censor, client_log, custom_support...)
+        # and only force the two this launcher owns.
+        lines = []
+        try:
+            if target_cfg.is_file():
+                lines = [ln for ln in target_cfg.read_text(encoding="utf-8").splitlines()
+                         if ln.split("=", 1)[0].strip() not in ("enabled", "server")]
+        except Exception:
+            lines = []
+        cfg_content = "\n".join([f"enabled=true", f"server={target_server}", *lines]) + "\n"
         try:
             target_cfg.write_text(cfg_content, encoding="utf-8")
         except Exception:
