@@ -929,7 +929,8 @@ def apply_square(st, chara_info: dict, square_id: int, rng=None) -> dict:
 
     if st.get("reserve_square_id") == square_id:
         st["reserve_square_id"] = 0
-    st["board"] = _roll_board(st, r, chara_info)   # refreshes after every lesson
+    reserved = int(st.get("reserve_square_id") or 0)
+    st["board"] = reroll_board(st, chara_info, keep=reserved, rng=r)   # refreshes after every lesson, keeping reserved
     return result
 
 
@@ -1503,12 +1504,18 @@ def build_live_data_set(full_state: dict, chara_info: dict,
              "performance_inc_dec_info_array": [], "params_inc_dec_info_array": []}
             for cmd in TRAINING_COMMAND_IDS]
 
+    board = [int(s) for s in (st.get("board") or ())]
+    reserved = int(st.get("reserve_square_id") or 0)
+    if reserved and reserved not in board:
+        reserved = 0
+        st["reserve_square_id"] = 0
+
     return {
         "live_performance_info": perf,
         "command_info_array": list(command_info_array),
         "evaluation_info_array": _live_members(chara_info, full_state),
         "next_square_info_array": [{"square_id": sid, "square_num": i + 1}
-                                   for i, sid in enumerate(st.get("board") or ())],
+                                   for i, sid in enumerate(board)],
         "master_live_id_array": sorted(st.get("songs") or ()),
         "next_live_id_array": sorted(st.get("pending_songs") or ()),
         "effected_live_id_array": sorted(st.get("active_songs") or ()),
@@ -1521,7 +1528,7 @@ def build_live_data_set(full_state: dict, chara_info: dict,
         "live_result_array": [{"live_type": int(r.get("live_type") or 0),
                                "result_state": int(r.get("result_state") or 0)}
                               for r in (st.get("lives_done") or ())],
-        "reserve_square_id": int(st.get("reserve_square_id") or 0),
+        "reserve_square_id": reserved,
         "training_bonus_array": [
             {"target_type": int(k), "effect_value": int(v)}
             for k, v in sorted((st.get("training_bonus") or {}).items(),
