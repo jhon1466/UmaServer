@@ -4781,7 +4781,8 @@ def _career_player_race_chara(chara_info: dict, viewer_id,
     which is fixture junk (see _best_running_style)."""
     chara = dict(chara_info)
     chara["running_style"] = running_style or _best_running_style(chara_info)
-    chara.setdefault("viewer_id", viewer_id)
+    vid = int(viewer_id) if str(viewer_id).isdigit() else viewer_id
+    chara.setdefault("viewer_id", vid)
     chara.setdefault("trainer_name", "Trainer")
     return chara
 
@@ -5636,10 +5637,11 @@ def _simulate_career_race(chara_info: dict, viewer_id, race_instance_id: int,
             mine = int(cond["frame_order"]) - 1
             others = [g for g in range(stalls) if g != mine]
             forced_gates = [mine] + _field_rng(chara_info, program_id, "gate").sample(others, len(opponents))
+        vid = int(viewer_id) if str(viewer_id).isdigit() else viewer_id
         result = race_simulator.simulate_race(
             player, opponents, race_instance_id, ground_condition=cond["ground_condition"],
             weather=cond["weather"], season=cond["season"], single_mode=True, gate_assignment=forced_gates,
-            race_context={"subWeather": cond.get("sub_weather", 0), "viewer_id": viewer_id})
+            race_context={"subWeather": cond.get("sub_weather", 0), "viewer_id": vid})
         if result is None:
             return None
 
@@ -5913,8 +5915,28 @@ def _resolve_and_enter_race(payload: dict) -> dict:
         rsi.update({k: v for k, v in _career_race_conditions(program_id, chara_info).items()
                     if k != "frame_order"})
 
+    existing_ctx = full_state.get(RACE_CTX_KEY) or {}
     sim = None
-    if chara_info is not None and race_info and race_info.get("race_instance_id"):
+    if (existing_ctx.get("program_id") == program_id
+            and existing_ctx.get("turn") == current_turn
+            and (existing_ctx.get("race_start_info") or {}).get("race_horse_data")
+            and existing_ctx.get("race_scenario")):
+        sim = {
+            "race_horse_data": copy.deepcopy(existing_ctx["race_start_info"]["race_horse_data"]),
+            "random_seed": existing_ctx["race_start_info"].get("random_seed"),
+            "race_scenario": existing_ctx.get("race_scenario"),
+            "player_finish_order": existing_ctx.get("player_finish_order"),
+            "player_finish_time": existing_ctx.get("player_finish_time"),
+            "player_popularity": existing_ctx.get("player_popularity"),
+            "rival_finish_orders": existing_ctx.get("rival_finish_orders"),
+            "player_rushed_count": existing_ctx.get("player_rushed_count"),
+            "player_skills_used": existing_ctx.get("player_skills_used"),
+            "player_overtakes": existing_ctx.get("player_overtakes"),
+            "beat_happy_meek": existing_ctx.get("beat_happy_meek", False),
+        }
+        rsi["race_horse_data"] = sim["race_horse_data"]
+        rsi["random_seed"] = sim["random_seed"]
+    elif chara_info is not None and race_info and race_info.get("race_instance_id"):
         sim = _simulate_career_race(chara_info, viewer_id, race_info["race_instance_id"],
                                     running_style=player_style,
                                     program_id=race_info.get("program_id"),
@@ -16209,6 +16231,11 @@ def handle_race_analyze(payload: dict) -> dict:
     program_id = payload.get("program_id")
     horses = []
     if ctx and (program_id in (None, 0) or ctx.get("program_id") == program_id):
+        horses = copy.deepcopy((ctx.get("race_start_info") or {}).get("race_horse_data") or [])
+    elif program_id:
+        _resolve_and_enter_race(payload)
+        full_state = state_store.get_state(viewer_id) or {}
+        ctx = full_state.get(RACE_CTX_KEY) or {}
         horses = copy.deepcopy((ctx.get("race_start_info") or {}).get("race_horse_data") or [])
     return {"response_code": 1,
             "data_headers": {"result_code": 1, "notifications": {}},

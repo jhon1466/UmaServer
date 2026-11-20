@@ -144,7 +144,14 @@ def build_input(horses, course_set_id, ground, weather, season, seed, gates,
         h["running_style"] = int(h.get("running_style") or 2)
         h["motivation"] = int(h.get("motivation") or 3)
         h["chara_id"] = int(h.get("chara_id") or (h.get("card_id") or 0) // 100)
-        h["viewer_id"] = (h["viewer_id"] or 0) if "viewer_id" in h else int(h.get("is_viewer", i == 0))
+        vid = h.get("viewer_id")
+        if vid is not None and vid != "":
+            try:
+                h["viewer_id"] = int(vid)
+            except (ValueError, TypeError):
+                h["viewer_id"] = vid
+        else:
+            h["viewer_id"] = int(h.get("is_viewer", i == 0))
         h["popularity"] = int(h.get("popularity") or popularity.index(i) + 1)
         h["skill_array"] = [{"skill_id": int(sk["skill_id"]), "level": int(sk.get("level") or 1)} for sk in h.get("skill_array") or []]
         prepared.append(h)
