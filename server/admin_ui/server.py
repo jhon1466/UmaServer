@@ -100,16 +100,7 @@ class Handler(BaseHTTPRequestHandler):
                 # must not stick in the browser after the icon becomes available.
                 return self._send(404, b"no icon", "text/plain", "no-store")
             return self._send(200, body, "image/png", "max-age=604800")
-        if path == "/":
-            path = "/index.html"
-        file = (STATIC / path.lstrip("/")).resolve()
-        if not file.is_file() or STATIC not in file.parents:
-            return self._send(404, b"not found", "text/plain")
-        ctype = mimetypes.guess_type(file.name)[0] or "application/octet-stream"
-        if file.suffix == ".js":
-            ctype = "text/javascript"
-        cache = "max-age=31536000, immutable" if file.suffix == ".woff2" else "no-cache"
-        self._send(200, file.read_bytes(), ctype, cache)
+        return self._send(404, b"not found", "text/plain")
 
     def do_POST(self):
         if not self._allowed():
