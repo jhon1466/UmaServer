@@ -16,8 +16,21 @@
 ![Steam](https://img.shields.io/badge/Steam-Global%20%7C%20JP-1b2838?style=plastic&logo=steam&logoColor=white)
 
 <a href="https://github.com/jhon1466/UmaServer/releases/latest"><img src="https://img.shields.io/badge/Descargar%20UmaPS-ec4899?style=plastic&logo=github&logoColor=white" alt="Descargar UmaPS" /></a>
+<a href="https://discord.gg/sfPVdxpv98"><img src="https://img.shields.io/badge/%C3%9Anete%20a%20Discord-5865F2?style=plastic&logo=discord&logoColor=white" alt="Discord" /></a>
 
 Servidor Global (8443) · Servidor JP (8444)
+
+</div>
+
+---
+
+## 💬 Comunidad
+
+<div align="center">
+
+<a href="https://discord.gg/sfPVdxpv98"><img src="https://img.shields.io/badge/Discord-%C3%9Anete%20a%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white&labelColor=404EED" alt="Discord" height="40" /></a>
+
+¿Dudas, errores o ideas? Únete al **servidor de Discord**: ahí se anuncian las novedades, se reportan fallos y se ayuda con la instalación.
 
 </div>
 
