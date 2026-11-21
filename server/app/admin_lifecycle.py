@@ -1,4 +1,3 @@
-"""Run the loopback admin panel for the lifetime of a PS worker."""
 
 from contextlib import asynccontextmanager
 import logging
@@ -18,16 +17,12 @@ async def lifespan(app):
         async with _admin_panel(app):
             yield
     finally:
-        # Ctrl-C: uvicorn finishes in-flight requests, then lands here. Every
-        # save is already committed (state.py is write-through); this folds
-        # the WAL back into state.sqlite3 and closes the connections.
         state.close()
         log.info("State saved and closed.")
 
 
 @asynccontextmanager
 async def _admin_panel(app):
-    # The embedded management service shares the server lifecycle.
     if os.environ.get("UMA_ADMIN_ENABLED", "1").strip().lower() in {"0", "false", "off"}:
         yield
         return
@@ -40,7 +35,6 @@ async def _admin_panel(app):
     if not 0 <= port <= 65535:
         raise ValueError("UMA_ADMIN_PORT must be between 0 and 65535")
     try:
-        # Extra Host/Origin names to accept, e.g. a `tailscale serve` front end.
         hosts = [h.strip() for h in os.environ.get("UMA_ADMIN_HOSTS", "").split(",") if h.strip()]
         panel = PanelServer(port, extra_hosts=hosts)
     except OSError as ex:

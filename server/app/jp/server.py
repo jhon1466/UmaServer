@@ -1,16 +1,3 @@
-"""The JP server process: `uvicorn app.jp.server:app` with UMA_REGION=jp.
-
-Launch through `./start-server.sh --region jp`, which sets the region, the JP
-certificate and the loopback address.
-
-    JP wire (transport.py)  ->  shared pipeline (app/dispatch.py, Global's handlers)
-                            ->  JP header rules (finish)  ->  JP seal
-
-The handlers are Global's; the data under them is JP's own (region.data_dir():
-server/data/jp, seeded by tools/build_jp_seeds.py; JP's master.mdb). No
-captured reply is ever served: app/fixtures.py indexes none for JP, so an
-endpoint without a handler gets a bare success envelope and a warning naming it.
-"""
 
 from __future__ import annotations
 
@@ -27,7 +14,6 @@ from ..admin_lifecycle import lifespan
 if region.PROCESS_REGION != "jp":
     raise RuntimeError("app.jp.server needs UMA_REGION=jp (use ./start-server.sh --region jp)")
 
-# Same policy as Global's main.py: console at UMA_LOG_LEVEL, file always DEBUG.
 _LOG_DIR = Path(__file__).resolve().parents[2] / "logs"
 _LOG_DIR.mkdir(exist_ok=True)
 _file_handler = logging.handlers.RotatingFileHandler(
@@ -38,16 +24,15 @@ logging.basicConfig(level=logging.DEBUG, handlers=[logging.StreamHandler(), _fil
 logging.getLogger().handlers[0].setLevel(os.environ.get("UMA_LOG_LEVEL", "INFO").upper())
 log = logging.getLogger("uma-server")
 
-from .. import dispatch as pipeline  # noqa: E402  (after logging, like main.py)
-from .. import scenarios  # noqa: E402
-from ..result_codes import refuse  # noqa: E402
-from . import arming, endpoints, features, keys, schema, story_ids, transport  # noqa: E402
+from .. import dispatch as pipeline
+from .. import scenarios
+from ..result_codes import refuse
+from . import arming, endpoints, features, keys, schema, story_ids, transport
 
 pipeline.HANDLERS.update(endpoints.HANDLERS)
 pipeline.HANDLERS.update(features.HANDLERS)
 pipeline.REQUEST_GUARDS.append(features.trainer_skill.before)
 
-# Career endpoint families this server has a scenario for, from the registry.
 _SERVED_FAMILIES = {"single_mode"} | {s.endpoint_prefix for s in scenarios.all_scenarios()}
 
 
@@ -56,10 +41,6 @@ def _refuse_unserved_scenario(payload: dict) -> dict:
 
 
 def _guard_scenario_family(endpoint: str) -> None:
-    """A career family with no scenario here (JP's Onsen, Ramen, ... -- scenarios
-    5-14) must REFUSE, never succeed empty: a fake success makes the client
-    believe a career exists and layers that scenario's UI over the next one
-    (Global's _UNSUPPORTED_STARTS comment records the live softlock)."""
     family = endpoint.split("/", 1)[0]
     if (family.startswith("single_mode_") and family not in _SERVED_FAMILIES
             and endpoint not in pipeline.HANDLERS):
@@ -68,12 +49,6 @@ def _guard_scenario_family(endpoint: str) -> None:
 
 
 def flatten_request_common(payload: dict) -> dict:
-    """JP's client nests a career request's fields one level down, in a map
-    named for the call (`WIRE` 2.31.0: single_mode_start_request_common.
-    start_chara, single_mode_check_event_request_common.event_id, ...,
-    select_succession_request_common); Global's client, which the shared
-    handlers were written for, sends the same fields at the top level. Lift
-    them, never over a top-level field of the same name."""
     for key, inner in list(payload.items()):
         if key.endswith("_request_common") and isinstance(inner, dict):
             for k, v in inner.items():
@@ -82,17 +57,14 @@ def flatten_request_common(payload: dict) -> dict:
 
 
 app = FastAPI(title="Umamusume private server (JP)", lifespan=lifespan)
-from .. import custom_support, custom_support_http
+from .. import client_versions, custom_support, custom_support_http
 app.include_router(custom_support_http.router)
+from .. import profile_images
+app.include_router(profile_images.router)
 arming.start()
 
 
 def finish(resp: dict, endpoint: str, payload: dict | None = None) -> dict:
-    """JP's per-reply rules the shared pipeline does not know about: JP's
-    support-card rule applied to whatever the handler granted
-    (features/support_cards.py), the reply completed to the real JP shape
-    (schema.py), events under their full story id (story_ids.py), and
-    server_list only where the real server sends it."""
     handled = endpoint in pipeline.HANDLERS or pipeline.registry.get(endpoint) is not None
     resp = features.support_cards.apply(endpoint, payload, resp)
     if (resp.get("data_headers") or {}).get("result_code", 1) == 1:
@@ -100,6 +72,7 @@ def finish(resp: dict, endpoint: str, payload: dict | None = None) -> dict:
         features.profile_slots.fill(endpoint, resp)
         resp = schema.conform(endpoint, resp, handled)
         story_ids.apply(resp)
+        _mask_previews(endpoint, resp.get("data"))
     dh = resp.setdefault("data_headers", {})
     if endpoint in endpoints.SERVER_LIST_ENDPOINTS:
         dh["server_list"] = endpoints.SERVER_LIST
@@ -108,11 +81,35 @@ def finish(resp: dict, endpoint: str, payload: dict | None = None) -> dict:
     return resp
 
 
+_NO_PREVIEW_ENDPOINTS = ("race_entry", "race_end", "race_out", "gain_skills")
+
+
+_KEEP_SET_COMMANDS = frozenset({"legend_data_set", "pioneer_data_set", "festa_data_set",
+                                "onsen_data_set"})
+
+
+def _mask_previews(endpoint: str, data) -> None:
+    if not endpoint.startswith("single_mode") or not isinstance(data, dict):
+        return
+    hi = data.get("home_info")
+    if not isinstance(hi, dict) or not hi.get("command_info_array"):
+        return
+    ci = data.get("chara_info") or {}
+    if not (data.get("unchecked_event_array") or ci.get("playing_state", 1) != 1
+            or endpoint.rsplit("/", 1)[-1] in _NO_PREVIEW_ENDPOINTS):
+        return
+    hi = data["home_info"] = dict(hi)
+    hi["command_info_array"] = [
+        {**c, **({"params_inc_dec_info_array": None} if "params_inc_dec_info_array" in c else {}),
+         **({"failure_rate": 0} if "failure_rate" in c else {})}
+        for c in hi["command_info_array"]]
+    for key, ds in list(data.items()):
+        if (key.endswith("_data_set") and key not in _KEEP_SET_COMMANDS
+                and isinstance(ds, dict) and ds.get("command_info_array") is not None):
+            data[key] = {**ds, "command_info_array": None}
+
+
 def _played_branch(endpoint: str, payload: dict) -> int | None:
-    """The story branch of the event a career check_event is committing, read
-    off the event still on screen BEFORE the handler replaces it. JP's reply
-    names it (`WIRE` 2.31.0: select_index_info_array on every real
-    check_event reply, [{branch_number: 1, select_index: <branch>}])."""
     if not endpoint.endswith("/check_event") or not endpoint.startswith("single_mode"):
         return None
     from .. import state as state_store
@@ -124,8 +121,6 @@ def _played_branch(endpoint: str, payload: dict) -> int | None:
 
 
 def handle(endpoint: str, payload: dict, sid) -> dict:
-    """One JP request through the shared pipeline: the JP request form in, the
-    JP reply form out. dispatch() below and the in-process tools share it."""
     payload = flatten_request_common(payload)
     _guard_scenario_family(endpoint)
     if not custom_support.preflight(endpoint, payload):
@@ -144,7 +139,11 @@ def handle(endpoint: str, payload: dict, sid) -> dict:
     features.exhibition.after(endpoint, payload, resp)
     features.archive.after(endpoint, payload, resp)
     features.trainer_skill.after(endpoint, payload, resp)
+    features.continue_unlock.after(endpoint, payload, resp)
     data = resp.get("data")
+    decided = data.pop("_played_branch", None) if isinstance(data, dict) else None
+    if decided is not None:
+        branch = decided
     if branch is not None and isinstance(data, dict):
         data["select_index_info_array"] = [{"branch_number": 1, "select_index": branch}]
     return resp
@@ -157,6 +156,7 @@ async def dispatch(endpoint_path: str, request: Request) -> Response:
         endpoint = endpoint[len("umamusume/"):]
     raw = await request.body()
     headers = dict(request.headers)
+    profile_images.set_request_base(headers)
 
     try:
         decoded = transport.open_request(raw, headers, keys.private_scalar(), arming.SESSIONS)
@@ -168,23 +168,18 @@ async def dispatch(endpoint_path: str, request: Request) -> Response:
         return Response(status_code=400)
 
     endpoints.remember_session(decoded)
-    client_res_ver = next((v for k, v in headers.items() if k.lower() == "res-ver"), "")
-    client_app_ver = next((v for k, v in headers.items() if k.lower() == "app-ver"), "")
-    if endpoint == "tool/start_session" and (client_app_ver or client_res_ver):
-        log.info("JP client headers: app-ver=%s res-ver=%s", client_app_ver, client_res_ver)
     token = endpoints.CURRENT_REQUEST.set(decoded)
-    res_token = pipeline.CURRENT_CLIENT_RES_VER.set(client_res_ver)
+    ver = client_versions.observe(headers)
     try:
         payload = decoded.payload if isinstance(decoded.payload, dict) else {}
         with custom_support.request_context(headers, payload):
             resp = custom_support.project(handle(endpoint, payload, decoded.sid))
     finally:
-        pipeline.CURRENT_CLIENT_RES_VER.reset(res_token)
+        client_versions.reset(ver)
         endpoints.CURRENT_REQUEST.reset(token)
 
     wire = transport.seal_reply(resp, decoded)
     body, extra_headers = transport.encode_http_body(wire, headers.get("accept-encoding", ""))
-    # `WIRE` the real server's reply headers (TLS proxy in front of Cygames).
     return Response(content=body, media_type="application/x-msgpack; charset=utf-8",
                     headers={"Cache-Control": "max-age=0, no-cache, no-store",
                              "Pragma": "no-cache", **extra_headers})

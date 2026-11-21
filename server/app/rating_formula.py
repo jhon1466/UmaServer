@@ -1,16 +1,10 @@
-"""
-Career rank-score formula, ported from the for-reals-uma-sim-main project's
-rating_formula.py (same source/pattern as training_formula.py's port of that
-project's training math). Verified against real captured trained_chara
-entries: get_rating([speed, stamina, power, wiz, guts]) reproduces the real
-rank_score exactly for every sampled roster entry.
-"""
 
 from __future__ import annotations
 
+import re
+
 MAX_STAT_VALUE = 2500
 
-# --- Tier rate arrays (same data as the original JS STAT_SCORES IIFE) ---
 _R1 = [
     5, 8, 10, 13, 16, 18, 21, 24, 26, 28, 29, 30, 31, 33, 34, 35, 39, 41, 42, 43, 52, 55, 66,
     68, 68
@@ -26,14 +20,8 @@ _R2 = [
 
 
 def _build_score_table():
-    """Precompute score for every stat value 0..MAX_STAT_VALUE in one pass.
-
-    The original implementation looped from 1 up to the queried stat on every
-    call (O(stat) per call); this builds the same cumulative sums once.
-    """
     table = [0] * (MAX_STAT_VALUE + 1)
 
-    # Phase 1: 1..1200
     raw = 0
     idx = 0
     for c in range(1, 1201):
@@ -44,9 +32,8 @@ def _build_score_table():
         elif c % 50 == 0:
             idx += 1
         raw += _R1[idx]
-        table[c] = round(raw / 10)
+        table[c] = (raw + 5) // 10
 
-    # Phase 2: 1201..2000
     raw = 38413
     idx = 0
     for c in range(1201, 2001):
@@ -57,9 +44,8 @@ def _build_score_table():
         elif c % 10 == 0:
             idx += 1
         raw += _R2[idx]
-        table[c] = round(raw / 10)
+        table[c] = (raw + 5) // 10
 
-    # Phase 3: 2001..MAX_STAT_VALUE
     raw = 142796
     idx = 0
     rate = 183
@@ -69,7 +55,7 @@ def _build_score_table():
             idx = 0
         raw += rate
         idx += 1
-        table[c] = round(raw / 10)
+        table[c] = (raw + 5) // 10
 
     return table
 
@@ -77,35 +63,14 @@ def _build_score_table():
 _SCORE_TABLE = _build_score_table()
 
 
-# The table ends at MAX_STAT_VALUE. Past that it CONTINUES LINEARLY at the
-# slope it finished on, instead of flattening: a stat of 2,500 and a stat of a
-# million used to score identically, so nothing above the table's end was worth
-# anything. Phase 3 grows by `rate/10` per point (rate creeps +1 every 25
-# points), so the final step is the natural slope to carry forward.
 _TOP_SLOPE = _SCORE_TABLE[MAX_STAT_VALUE] - _SCORE_TABLE[MAX_STAT_VALUE - 1]
 
-# rank_score travels as a 32-bit signed int; past this the client can't read it.
 INT32_MAX = 2_147_483_647
 
-# Per-uma rank_score is clamped here rather than at INT32_MAX: an
-# uncapped/near-int32 rank_score on an individual trained_chara is what
-# caused the OverflowException crash documented in
-# trained_chara.py's MAXED_VETERAN_FAN_CEILING comment (Team Stadium's own
-# rank-score math multiplies a member's rank_score, and any factor at all
-# overflows int32 from a starting value that high). 999,999 keeps every
-# per-uma score comfortably inside the 6-digit display real veterans use
-# (legitimately maxed careers top out ~900k) while leaving no headroom to
-# ever revisit that crash class. Account-wide aggregates that legitimately
-# sum many umas' scores (Note Archive's directory total, Team Stadium's
-# best_point, the profile's own rank_score) are NOT covered by this --
-# real captured accounts already exceed 999,999 there and are not the
-# per-uma value this cap targets.
 MAX_RANK_SCORE = 999_999
 
 
 def get_stat_score(stat: int, max_stat_value: int = MAX_STAT_VALUE) -> int:
-    """Rating score for a stat value. Table lookup up to max_stat_value, then a
-    straight-line extension at the table's own final slope."""
     stat = int(stat)
     if stat <= 0:
         return 0
@@ -115,12 +80,6 @@ def get_stat_score(stat: int, max_stat_value: int = MAX_STAT_VALUE) -> int:
 
 
 def get_rating(stats) -> int:
-    """Total rating for a 5-stat list (unweighted sum of stat scores).
-
-    Clamped to MAX_RANK_SCORE: a stat in the billions extrapolates the score
-    table's linear tail into numbers that overflow int32 downstream (see
-    MAX_RANK_SCORE's own comment) long before the wire's own int32 ceiling
-    would. Clamping here keeps every per-uma score in the safe range."""
     total = sum(get_stat_score(s) for s in stats if s and int(s) > 0)
     return min(MAX_RANK_SCORE, total)
 
@@ -128,32 +87,45 @@ def get_rating(stats) -> int:
 _SKILL_GRADE: dict | None = None
 
 
-def get_skill_score(skill_array) -> int:
-    """Score contributed by a trainee's skills: master.mdb's
-    skill_data.grade_value, summed.
+def _aptitude_rate(level) -> float:
+    level = int(level or 0)
+    return 1.1 if level >= 7 else 0.9 if level >= 5 else 0.8 if level >= 2 else 0.7
 
-    Skills used to contribute NOTHING to the career score, so buying 25 of them
-    moved the number not at all (#36). Measured against 830 captured
-    trained_chara entries, stats + this sum lands a median ~3% under the real
-    rank_score (ratio 1.128 of the flat sum), so a per-skill multiplier we
-    can't see from master is still missing -- but that is a refinement on top
-    of the right quantity, where before the whole term was absent. Skills the
-    master doesn't know contribute 0 rather than raising."""
+
+_STYLE_KEYS = {1: "nige", 2: "senko", 3: "sashi", 4: "oikomi"}
+_DISTANCE_KEYS = {1: "short", 2: "mile", 3: "middle", 4: "long"}
+
+
+def _skill_rate(cond: str, aptitudes: dict) -> float:
+    rate = 1.0
+    m = re.search(r"running_style==(\d)", cond)
+    if m and int(m.group(1)) in _STYLE_KEYS:
+        rate *= _aptitude_rate(aptitudes.get(
+            "proper_running_style_" + _STYLE_KEYS[int(m.group(1))]))
+    m = re.search(r"distance_type==(\d)", cond)
+    if m and int(m.group(1)) in _DISTANCE_KEYS:
+        rate *= _aptitude_rate(aptitudes.get(
+            "proper_distance_" + _DISTANCE_KEYS[int(m.group(1))]))
+    return rate
+
+
+def get_skill_score(skill_array, aptitudes: dict | None = None) -> int:
     global _SKILL_GRADE
     if _SKILL_GRADE is None:
         from . import master_data
-        _SKILL_GRADE = {r["id"]: r["grade_value"] or 0
-                        for r in master_data.query("SELECT id, grade_value FROM skill_data")}
+        _SKILL_GRADE = {r["id"]: (r["grade_value"] or 0,
+                                  (r["condition_1"] or "") + " " + (r["condition_2"] or ""))
+                        for r in master_data.query(
+                            "SELECT id, grade_value, condition_1, condition_2 FROM skill_data")}
     total = 0
     for s in skill_array or ():
         sid = s.get("skill_id") if isinstance(s, dict) else s
-        total += _SKILL_GRADE.get(sid, 0)
+        grade, cond = _SKILL_GRADE.get(sid, (0, ""))
+        total += grade if aptitudes is None else round(grade * _skill_rate(cond, aptitudes))
     return total
 
 
 def get_career_score(chara_info: dict) -> int:
-    """The career's rank score: stats plus the skills the player actually has.
-    Clamped to MAX_RANK_SCORE for the same reason get_rating is."""
     stats = [chara_info.get(k, 0) for k in ("speed", "stamina", "power", "wiz", "guts")]
     return min(MAX_RANK_SCORE,
                get_rating(stats) + get_skill_score(chara_info.get("skill_array")))
