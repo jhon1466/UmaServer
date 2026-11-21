@@ -50,9 +50,15 @@ app.include_router(custom_support_http.router)
 @app.post("/{endpoint_path:path}")
 async def dispatch(endpoint_path: str, request: Request):
     raw = await request.body()
-    decoded = crypto.decode_request(raw, dict(request.headers))
-    with custom_support.request_context(dict(request.headers), decoded.payload):
-        patched = custom_support.project(pipeline.handle_decoded(endpoint_path, decoded.payload, decoded.sid or None))
+    headers = dict(request.headers)
+    decoded = crypto.decode_request(raw, headers)
+    client_res_ver = next((v for k, v in headers.items() if k.lower() == "res-ver"), "")
+    res_token = pipeline.CURRENT_CLIENT_RES_VER.set(client_res_ver)
+    try:
+        with custom_support.request_context(headers, decoded.payload):
+            patched = custom_support.project(pipeline.handle_decoded(endpoint_path, decoded.payload, decoded.sid or None))
+    finally:
+        pipeline.CURRENT_CLIENT_RES_VER.reset(res_token)
     body = crypto.encode_response(patched, decoded.udid_raw)
     # VERIFIED 2026-08-11 against a live real-server capture
     # (tools/capture_proxy.py --upstream real): the real server's

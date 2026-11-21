@@ -57,7 +57,8 @@ def _ok(data: dict) -> dict:
 
 
 def resource_version() -> str:
-    return str(config.get("resource_version", ""))
+    from .. import dispatch as pipeline
+    return pipeline._resource_version()
 
 
 def handle_pre_signup(payload: dict) -> dict:

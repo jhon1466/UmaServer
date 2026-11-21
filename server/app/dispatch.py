@@ -15,6 +15,7 @@ friends, so nothing here branches on the region.
 
 from __future__ import annotations
 
+import contextvars
 import copy
 import json
 import logging
@@ -326,8 +327,22 @@ GAME_RESOURCE_VERSION = "10007550"   # 2026-08-25, authoritative -- read straigh
                                       # APP-VER still 1.34.0 unchanged). Was
                                       # 10007400.
 
+CURRENT_CLIENT_RES_VER: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "UMA_CLIENT_RES_VER", default=""
+)
+
+
+def _res_ver_num(v: str) -> int:
+    head = (v or "").split(":", 1)[0].strip()
+    return int(head) if head.isdigit() else 0
+
+
 def _resource_version() -> str:
-    return str(config.get("resource_version", GAME_RESOURCE_VERSION))
+    configured = str(config.get("resource_version", GAME_RESOURCE_VERSION))
+    client = CURRENT_CLIENT_RES_VER.get()
+    if client and _res_ver_num(client) >= _res_ver_num(configured):
+        return client
+    return configured
 
 # Fields the newer client expects that pre-update fixtures don't contain.
 # pre_single_mode/index gained default_running_style_array; without it the career

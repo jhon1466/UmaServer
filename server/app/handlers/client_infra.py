@@ -84,7 +84,7 @@ def handle_get_pre_download_resource_version(payload: dict) -> dict:
     is a null string on a code path that compares it against the local one."""
     from . import load as load_handler       # noqa: F401  (kept for symmetry)
     from .. import dispatch as _main
-    version = str(config.get("resource_version", _main.GAME_RESOURCE_VERSION))
+    version = _main._resource_version()
     return _ok({"resource_version": version})
 
 

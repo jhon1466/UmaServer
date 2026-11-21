@@ -168,12 +168,18 @@ async def dispatch(endpoint_path: str, request: Request) -> Response:
         return Response(status_code=400)
 
     endpoints.remember_session(decoded)
+    client_res_ver = next((v for k, v in headers.items() if k.lower() == "res-ver"), "")
+    client_app_ver = next((v for k, v in headers.items() if k.lower() == "app-ver"), "")
+    if endpoint == "tool/start_session" and (client_app_ver or client_res_ver):
+        log.info("JP client headers: app-ver=%s res-ver=%s", client_app_ver, client_res_ver)
     token = endpoints.CURRENT_REQUEST.set(decoded)
+    res_token = pipeline.CURRENT_CLIENT_RES_VER.set(client_res_ver)
     try:
         payload = decoded.payload if isinstance(decoded.payload, dict) else {}
         with custom_support.request_context(headers, payload):
             resp = custom_support.project(handle(endpoint, payload, decoded.sid))
     finally:
+        pipeline.CURRENT_CLIENT_RES_VER.reset(res_token)
         endpoints.CURRENT_REQUEST.reset(token)
 
     wire = transport.seal_reply(resp, decoded)
