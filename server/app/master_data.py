@@ -105,7 +105,7 @@ def _overlay_english_text(conn: sqlite3.Connection) -> None:
         log.warning("master_data: no Global master.mdb for English text (set UMA_EN_TEXT_MDB) "
                     "-- events, epithets and race stories will not resolve on JP")
         return
-    conn.execute("ATTACH DATABASE ? AS en", (f"file:{source.as_posix()}?mode=ro",))
+    conn.execute("ATTACH DATABASE ? AS en", (f"file:{source.as_posix()}?mode=ro&immutable=1",))
     conn.execute(
         "CREATE TEMP VIEW text_data AS "
         # A blank English row (JP-only content Global ships empty) keeps the
@@ -120,7 +120,7 @@ def get_connection() -> sqlite3.Connection:
     if _conn is None:
         # uri=True + mode=ro: fail fast on a locked/missing file rather than
         # silently creating an empty db at the wrong path.
-        uri = f"file:{MASTER_MDB_PATH.as_posix()}?mode=ro"
+        uri = f"file:{MASTER_MDB_PATH.as_posix()}?mode=ro&immutable=1"
         _conn = sqlite3.connect(uri, uri=True, check_same_thread=False)
         _conn.row_factory = sqlite3.Row
         if region.PROCESS_REGION == "jp":
