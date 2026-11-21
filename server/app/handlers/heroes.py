@@ -782,13 +782,13 @@ def handle_honor_select_chara(payload):
 
 def _finalist_scores(hid) -> list[int]:
     try:
-        own = json.loads((OS.LOH_DIR / "heroes_meta.json").read_text())["heroes"][str(hid)]["final_scores"]
+        own = json.loads((OS.LOH_DIR / "heroes_meta.json").read_text(encoding="utf-8"))["heroes"][str(hid)]["final_scores"]
         if own:
             return list(own)
     except (OSError, ValueError, KeyError):
         pass
     try:
-        return list(json.loads(FINALISTS.read_text())["scores"])
+        return list(json.loads(FINALISTS.read_text(encoding="utf-8"))["scores"])
     except (OSError, ValueError, KeyError):
         return []
 

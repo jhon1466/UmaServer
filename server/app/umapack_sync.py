@@ -22,7 +22,7 @@ def _settings_path() -> Path:
 
 def settings() -> dict:
     try:
-        return json.loads(_settings_path().read_text())
+        return json.loads(_settings_path().read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
 

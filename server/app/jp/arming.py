@@ -31,7 +31,7 @@ _last_udid: str | None = None
 
 def _load_tail20() -> None:
     try:
-        vals = json.loads(_tail20_path().read_text())
+        vals = json.loads(_tail20_path().read_text(encoding="utf-8"))
         _tail20[:] = [bytes.fromhex(v) for v in vals]
     except (OSError, ValueError):
         pass

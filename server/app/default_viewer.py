@@ -12,7 +12,7 @@ def _path():
 
 def chosen() -> str:
     try:
-        return "".join(_path().read_text().split())
+        return "".join(_path().read_text(encoding="utf-8").split())
     except OSError:
         return ""
 

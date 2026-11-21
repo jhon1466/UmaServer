@@ -35,7 +35,7 @@ def load() -> dict:
         if _cache["path"] == str(p) and _cache["mtime"] == mtime:
             return _cache["data"]
         try:
-            data = json.loads(p.read_text())
+            data = json.loads(p.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             data = {}
         _cache.update(path=str(p), mtime=mtime, data=data)
@@ -209,7 +209,7 @@ def catalog() -> list[dict]:
         name = p.name[:-len(".jsonl.gz")]
         meta = {}
         try:
-            meta = json.loads((gen_dir() / f"{name}.json").read_text())
+            meta = json.loads((gen_dir() / f"{name}.json").read_text(encoding="utf-8"))
         except (OSError, ValueError):
             pass
         out.append({"pool": f"gen:{name}", "kind": "generated", "teams": meta.get("teams"),

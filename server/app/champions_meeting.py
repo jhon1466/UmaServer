@@ -53,7 +53,7 @@ def load() -> dict:
         if _cache["path"] == str(p) and _cache["mtime"] == mtime:
             return _cache["data"]
         try:
-            data = json.loads(p.read_text())
+            data = json.loads(p.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return _cache["data"] or {}
         _cache.update(path=str(p), mtime=mtime, data=data)

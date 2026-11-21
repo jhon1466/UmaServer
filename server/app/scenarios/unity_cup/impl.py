@@ -723,7 +723,7 @@ def _captured_race_skills(chara_id: int):
     global _captured_skills, _captured_support_skills
     if _captured_skills is None:
         try:
-            captured = json.loads((region.data_dir() / _CAPTURED_SKILLS_NAME).read_text())
+            captured = json.loads((region.data_dir() / _CAPTURED_SKILLS_NAME).read_text(encoding="utf-8"))
             _captured_skills = captured["skills"]
             _captured_support_skills = captured.get("support_skills", {})
         except (OSError, ValueError, KeyError):

@@ -6,7 +6,7 @@
   "auth_enforce": false,
   "payment_mode": "instant",
   "_banner_max_age_days": "gacha/index listing age limit. null = every banner; 30 = only banners still running at some point in the last 30 days (end_date within 30 days of servertime). Open-ended/upcoming banners and gacha_odds.json \"on\": true always stay listed.",
-  "banner_max_age_days": null,
+  "banner_max_age_days": 0,
   "_testing_knobs": "Testing knobs, all null = real behaviour. force_ssr_rate: gacha SSR % per draw (0-100). force_failure_rate: every training's failure % (0-100). force_training_gain: every stat + skill points pinned to this number. training_gain_multiplier: scales the real formula's stat + skill point gains (e.g. 2 = double). See CONFIG_GUIDE_JP.md.",
   "force_ssr_rate": null,
   "force_failure_rate": null,

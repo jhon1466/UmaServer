@@ -14,7 +14,7 @@ def _load() -> tuple[int, bytes]:
     with region.use_region("jp"):
         key_path = region.data_dir() / "server_key.json"
     if key_path.is_file():
-        d = json.loads(key_path.read_text())
+        d = json.loads(key_path.read_text(encoding="utf-8"))
         priv = int(d["priv_int"])
     else:
         priv = int.from_bytes(os.urandom(32), "little")

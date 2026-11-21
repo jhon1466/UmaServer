@@ -164,7 +164,7 @@ def _immutable_manifest(path, digest):
 def _read_unreleased(files):
     out = []
     for path, _mtime in files:
-        b = json.loads(Path(path).read_text())
+        b = json.loads(Path(path).read_text(encoding="utf-8"))
         b["sha256"] = digest_file(path)
         out.append(b)
     return tuple(out)

@@ -2,7 +2,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-TABLES = json.loads(Path(__file__).with_name('master_data.json').read_text())
+TABLES = json.loads(Path(__file__).with_name('master_data.json').read_text(encoding="utf-8"))
 
 
 def rows(name):

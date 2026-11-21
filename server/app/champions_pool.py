@@ -34,7 +34,7 @@ def corpus_root() -> Path:
 def snapshots() -> list[dict]:
     root = corpus_root()
     try:
-        index = json.loads((root / "index.json").read_text())
+        index = json.loads((root / "index.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         index = []
     out = []

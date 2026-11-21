@@ -153,6 +153,12 @@ def handle_load_index(payload: dict) -> dict:
                 "circle_user": member,
             }
 
+    notifs = response.get("data_headers", {}).get("notifications")
+    if isinstance(notifs, dict):
+        notifs.pop("training_challenge_mission", None)
+        notifs.pop("mission_list", None)
+        notifs.pop("add_present_num", None)
+
     data = response.get("data")
     if isinstance(data, dict) and "login_bonus_list" in data:
         from . import login_bonus, presents

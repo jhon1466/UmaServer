@@ -6460,7 +6460,7 @@ def _secret_overlay() -> dict:
         return {}
     path = Path(__file__).resolve().parent.parent.parent / "data" / "jp_secret_events_overlay.json"
     try:
-        return json.loads(path.read_text())
+        return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
 

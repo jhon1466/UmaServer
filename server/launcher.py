@@ -493,6 +493,7 @@ def open_panel_when_ready(port: int, server: subprocess.Popen) -> None:
 def start(region: str, info: dict, key: Path, cert: Path, reload: bool, admin: bool, open_browser: bool = True) -> None:
     import threading
     os.environ["UMA_REGION"] = region
+    os.environ.setdefault("PYTHONUTF8", "1")
     if not admin:
         os.environ["UMA_ADMIN_ENABLED"] = "0"
     if not port_free(info["port"]):

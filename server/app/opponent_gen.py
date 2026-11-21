@@ -188,7 +188,7 @@ def compatible(mst: _Master, sid: int, style: int, env: dict) -> bool:
 
 def _ref_index() -> dict:
     try:
-        rows = json.loads((POOL.corpus_root() / "index.json").read_text())
+        rows = json.loads((POOL.corpus_root() / "index.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         rows = []
     return {e["snapshot"]: e for e in rows}
