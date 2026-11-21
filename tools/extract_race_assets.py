@@ -66,9 +66,14 @@ def main():
     for row in master.execute('SELECT * FROM race_course_set ORDER BY id'):
         record = dict(row)
         result['course_sets'][str(record['id'])] = {'master': record}
+    missing = 0
     for i,row in enumerate(rows):
+        name, digest, _key = row
+        dat_path = args.persistent/'dat'/digest[:2]/digest
+        if not dat_path.is_file():
+            missing += 1
+            continue
         extracted = bundle(args.persistent,row)
-        name = row[0]
         if name.endswith('ast_race_paramdefine'):
             result['race_param_define'] = floats(extracted)
         elif 'courseeventparam' in name:
@@ -77,7 +82,10 @@ def main():
         else:
             result['lane_assets'][name] = floats(extracted)
         if i % 50 == 0: print(f'{i}/{len(rows)}', flush=True)
-    assert result['race_param_define']
+    if missing:
+        print(f'warning: skipped {missing}/{len(rows)} undownloaded bundle(s) missing from dat/', flush=True)
+    if not result['race_param_define']:
+        raise FileNotFoundError('ast_race_paramdefine bundle not downloaded yet -- open the official game once and let it finish downloading data')
     for course in result['course_sets'].values():
         m = course.get('master')
         if not m: continue

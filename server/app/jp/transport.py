@@ -47,6 +47,7 @@ SESSION, BOUNDARY = 0xA6, 0x74
 # plugin reports the live value (see arming.py); these are the builds we have
 # measured, newest first, so a request opens even before the plugin reports.
 KNOWN_TAIL20 = (
+    bytes.fromhex("9e85a6a8d02e281b3a06c004149241bba6c4b4f5"),  # Steam JP build, reported 2026-11
     bytes.fromhex("fed5204454857f24ba09fad010e2c988c5684b90"),  # iOS build, reported 2026-10-10
     bytes.fromhex("964f11a0cc8024c558877ef091bedc8337df0a6b"),  # 2.31.0  `WIRE` 2026-09-18 capture
     bytes.fromhex("84ab20d67f3ca2b3f72a573718f21e341739e2ec"),  # 2.30.5

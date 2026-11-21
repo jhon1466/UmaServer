@@ -93,6 +93,8 @@ def jp_choices(node) -> None:
 
 
 def blank(schema: dict):
+    if not isinstance(schema, dict):
+        return ""
     t = schema.get("t")
     if t == "map":
         return {k: blank(s) for k, s in schema["f"].items()}
@@ -107,6 +109,8 @@ _SCALARS = ("int", "float", "str", "bool")
 
 
 def _conform(value, schema: dict, path: str, added: list, clashes: list):
+    if not isinstance(schema, dict):
+        return value
     t = schema.get("t")
     if value is None and t in _SCALARS:
         # Global's handlers send nil for a few scalars JP always sends typed
