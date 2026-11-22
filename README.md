@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="server/admin_ui/static/icon.png" alt="UmaServer" width="140" />
+<img src="umaps-app/public/icon.png" alt="UmaServer" width="140" />
 
 # UmaServer
 
