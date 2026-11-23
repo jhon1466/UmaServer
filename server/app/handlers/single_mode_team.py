@@ -1869,6 +1869,7 @@ def _maybe_fail_goal(response: dict, full_state: dict, career: dict, new_turn,
             failed = True
     if failed:
         chara_info["state"] = 2
+        chara_info["playing_state"] = 5
         timing = 1
         if not entry_failed:
             chara_info["turn"] = new_turn - 1
@@ -4185,7 +4186,7 @@ def _end_event_chain_state(viewer_id, response) -> None:
                        and int(events[0].get("play_timing") or 0) in _TURN_START_TIMINGS):
         return
     ci = data.get("chara_info")
-    if not isinstance(ci, dict) or ci.get("playing_state") != 5 or ci.get("state") == 3:
+    if not isinstance(ci, dict) or ci.get("playing_state") != 5 or ci.get("state") in (2, 3):
         return
     ci["playing_state"] = 1
     full_state = state_store.get_state(viewer_id) or {}
@@ -5183,6 +5184,7 @@ def handle_ura_race_out(payload: dict) -> dict:
             try:
                 if placement_failed:
                     chara_info["state"] = 2
+                    chara_info["playing_state"] = 5
                     _purge_queued_events(response, full_state)
                     _queue_turn_event(response, full_state, _career_fail_event(3),
                                       fail_chain=True)
