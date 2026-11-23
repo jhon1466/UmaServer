@@ -945,8 +945,10 @@ def _hidden_trainees():
         return set(), set()
     pack_cards, pack_charas = _pack_trainees()
     from . import master_data
-    stocked = {r[0] for r in master_data.query("SELECT DISTINCT chara_id FROM card_data")}
-    return cards - pack_cards, charas - pack_charas - stocked
+    rows = master_data.query("SELECT id, chara_id FROM card_data")
+    stocked_cards = {r[0] for r in rows}
+    stocked_charas = {r[1] for r in rows}
+    return cards - pack_cards - stocked_cards, charas - pack_charas - stocked_charas
 
 
 def preflight(endpoint, payload):

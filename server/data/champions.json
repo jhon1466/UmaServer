@@ -1,9 +1,7 @@
 {
  "clock": {
-  "mode": "cm",
-  "r0": 1792761814.5423813,
-  "s0": 1792761818,
-  "hold_until": 1792763617
+  "mode": "real",
+  "hw": 0
  },
  "pool": {
   "bands": {
@@ -31,12 +29,5 @@
   "snapshot": "cm21-early",
   "final_win_pressure": 0.7,
   "mood": "random"
- },
- "run": {
-  "champions_id": 25,
-  "start": 1792761817,
-  "end": 1792783416,
-  "hold": true,
-  "run_id": "25-1792761817"
  }
 }
