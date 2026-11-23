@@ -329,9 +329,9 @@ def handle_save_chara_data(payload: dict) -> dict:
 
     for field in ("dress_id", "mini_dress_id"):
         value = payload.get(field)
-        if value is None:
+        if value is None or value == 0:
             continue
-        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+        if not isinstance(value, int) or isinstance(value, bool) or value < 0:
             return _refuse()
         if value != 2:
             row = master_data.query_one(

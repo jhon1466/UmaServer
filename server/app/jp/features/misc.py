@@ -95,6 +95,8 @@ _STANDIN_MAX = 1000
 
 
 def _candidates(gacha_id: int) -> list:
+    if not master_data.has_table("select_pickup"):
+        return []
     return [r["card_id"] for r in master_data.query(
         "SELECT card_id FROM select_pickup WHERE gacha_id=? ORDER BY recommend_order",
         (gacha_id,))]

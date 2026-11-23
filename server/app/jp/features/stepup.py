@@ -21,6 +21,8 @@ def _ok(data: dict) -> dict:
 
 @functools.lru_cache(maxsize=1)
 def _ladders() -> dict:
+    if not master_data.has_table("gacha_stepup"):
+        return {}
     out: dict = {}
     for r in master_data.query(
             "SELECT stepup_id, target_gacha_id FROM gacha_stepup ORDER BY stepup_id, stepup_step"):

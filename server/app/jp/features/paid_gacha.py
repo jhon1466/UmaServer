@@ -12,8 +12,13 @@ PAID_BUTTON = 1
 
 @functools.lru_cache(maxsize=None)
 def _row(gacha_id: int) -> dict:
+    cols = ["type"]
+    if master_data.has_column("gacha_data", "paid_gacha_button_type"):
+        cols.append("paid_gacha_button_type")
+    if master_data.has_column("gacha_data", "draw_limit"):
+        cols.append("draw_limit")
     return dict(master_data.query_one(
-        "SELECT type, paid_gacha_button_type, draw_limit FROM gacha_data WHERE id=?",
+        f"SELECT {', '.join(cols)} FROM gacha_data WHERE id=?",
         (gacha_id,)) or {})
 
 
