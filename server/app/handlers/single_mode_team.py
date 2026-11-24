@@ -1838,7 +1838,7 @@ def _purge_queued_events(response: dict, full_state: dict) -> None:
 
 
 def _career_fail_event(play_timing: int = 1) -> dict:
-    e = _scenario_event_entry(1, 400000090, play_timing=play_timing, choices=[])
+    e = _scenario_event_entry(1, 400000090, play_timing=play_timing, choices=[_ack_choice()])
     e["event_contents_info"]["show_clear"] = 2
     return e
 
