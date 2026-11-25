@@ -153,14 +153,26 @@ def _grant(full_state: dict, row, count: int, summary: dict) -> None:
         if not any(c.get("card_id") == cid for c in cards):
             rar = master_data.query_one(
                 "SELECT MIN(rarity) AS r FROM card_rarity_data WHERE card_id=?", (cid,))
+            rarity = rar["r"] if rar and rar["r"] else 1
             now = time.strftime("%Y-%m-%d %H:%M:%S")
-            cards.append({"card_id": cid,
-                          "rarity": (rar["r"] if rar and rar["r"] else 1),
-                          "talent_level": 1, "skill_data_array": []})
+            cards.append({"card_id": cid, "rarity": rarity,
+                          "talent_level": 1, "create_time": now,
+                          "skill_data_array": []})
             summary["add_card_list"].append(
-                {"card_id": cid, "rarity": 3, "talent_level": 1, "create_time": now})
+                {"card_id": cid, "rarity": rarity, "talent_level": 1, "create_time": now})
+            dresses = []
+            for drow in master_data.query(
+                    "SELECT get_dress_id_1, get_dress_id_2 FROM card_rarity_data "
+                    "WHERE card_id=? AND rarity<=? ORDER BY rarity", (cid, rarity or 3)):
+                for dress in (drow["get_dress_id_1"], drow["get_dress_id_2"]):
+                    if dress and dress >= 1000 and dress not in dresses:
+                        dresses.append(dress)
+            cloth = full_state.setdefault("cloth_list_state", [])
+            for dress in dresses:
+                if not any(c.get("cloth_id") == dress for c in cloth):
+                    cloth.append({"cloth_id": dress})
             bonus = _empty_summary()
-            bonus["add_cloth_list"] = [{"cloth_id": cid}]
+            bonus["add_cloth_list"] = [{"cloth_id": d} for d in dresses]
             bonus["add_total_fan"] = 1
             summary["add_card_bonus_info"] = bonus
             chara = master_data.query_one(

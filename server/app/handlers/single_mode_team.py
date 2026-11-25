@@ -898,6 +898,17 @@ def _attach_scenario_data_set(viewer_id, response: dict, endpoint: str = "") -> 
             and int(ci_hold.get("playing_state") or 1) == 1
             and int(head_now.get("play_timing") or 0) not in _TURN_START_TIMINGS):
         ci_hold["playing_state"] = scen.turn_end_hold_state
+    elif (isinstance(ci_hold, dict) and int(ci_hold.get("playing_state") or 0) == 5
+          and ci_hold.get("state") not in (2, 3)
+          and (head_now is None or int(head_now.get("play_timing") or 0) in _TURN_START_TIMINGS)):
+        ci_hold["playing_state"] = 1
+        for k in _NESTED_COMMON_KEYS:
+            nested_ci = (data.get(k) or {}).get("chara_info") if isinstance(data.get(k), dict) else None
+            if isinstance(nested_ci, dict) and nested_ci.get("playing_state") == 5:
+                nested_ci["playing_state"] = 1
+        stored_ci = ((full_state.get(STATE_KEY) or {}).get("data") or {}).get("chara_info")
+        if isinstance(stored_ci, dict) and stored_ci.get("playing_state") == 5:
+            stored_ci["playing_state"] = 1
     if isinstance(data.get("chara_info"), dict):
         ci_turn = data["chara_info"]
         run_turn = int(ci_turn.get("turn") or 0)

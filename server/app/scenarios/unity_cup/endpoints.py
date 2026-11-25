@@ -715,9 +715,10 @@ def handle_team_race_out(payload: dict) -> dict:
     st = unity_cup.state(full_state)
     turn = int(payload.get("current_turn") or career["data"]["chara_info"].get("turn") or 0)
     _bank_pending_result(st)
-    career["data"]["chara_info"]["playing_state"] = unity_cup.PLAYING_STATE_EVENT_CHAIN
-    response = _envelope(full_state, career, "team_race_out")
     events = _take_post_race_events(st, turn, full_state)
+    career["data"]["chara_info"]["playing_state"] = (
+        unity_cup.PLAYING_STATE_EVENT_CHAIN if events else unity_cup.PLAYING_STATE_TRAINING)
+    response = _envelope(full_state, career, "team_race_out")
     if events:
         response["data"]["unchecked_event_array"] = events
     smt.state_store.save_state(viewer_id, full_state)
@@ -747,10 +748,12 @@ def handle_team_race_end_out(payload: dict) -> dict:
     st = unity_cup.state(full_state)
     turn = int(payload.get("current_turn") or career["data"]["chara_info"].get("turn") or 0)
     _bank_pending_result(st)
-    career["data"]["chara_info"]["playing_state"] = unity_cup.PLAYING_STATE_EVENT_CHAIN
+    events = _take_post_race_events(st, turn, full_state)
+    career["data"]["chara_info"]["playing_state"] = (
+        unity_cup.PLAYING_STATE_EVENT_CHAIN if events else unity_cup.PLAYING_STATE_TRAINING)
     data = {"chara_info": copy.deepcopy(career["data"]["chara_info"]),
             "tmp_team_rank": unity_cup.pending_rank(st),
-            "unchecked_event_array": _take_post_race_events(st, turn, full_state),
+            "unchecked_event_array": events,
             "add_music": _grant_team_race_song(full_state, st)}
     smt.state_store.save_state(viewer_id, full_state)
     return {"response_code": 1,

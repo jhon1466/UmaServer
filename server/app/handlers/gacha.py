@@ -500,7 +500,9 @@ def handle_index(payload: dict) -> dict:
     ids = [gid for gid in ids
           if gid not in gated or shop._item_count(full_state, gated[gid]) > 0]
     once_ids = _once_only_banners()
-    ids = [gid for gid in ids if gid not in once_ids or not (pity.get(str(gid)) or 0)]
+    ids = [gid for gid in ids
+           if gid not in once_ids
+           or (not (pity.get(str(gid)) or 0) and not paid_draws_used(full_state, gid))]
     picks = full_state.get(PRIZE_PICK_KEY) or {}
     info = [{"id": gid, "is_daily_draw_end": int(daily_draw_done(full_state, gid)),
              "prize_selected_card_type": (picks.get(str(gid)) or {}).get("card_type", 0),
@@ -602,7 +604,8 @@ def handle_exec(payload: dict) -> dict:
     if not banner or banner.get("odds_on") is False:
         return refuse(ResultCode.GACHA_NOT_IN_TERM)
     pity = full_state.get(PITY_KEY) or {}
-    if gacha_id in _once_only_banners() and (pity.get(str(gacha_id)) or 0):
+    if gacha_id in _once_only_banners() and (
+            (pity.get(str(gacha_id)) or 0) or paid_draws_used(full_state, gacha_id)):
         return refuse(ResultCode.GACHA_FIRST_TIME_ONLY_DRAW_END)
 
     draw_type = int(payload.get("draw_type") or 1)
