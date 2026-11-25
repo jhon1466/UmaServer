@@ -237,6 +237,37 @@ def paid_draws_used(full_state: dict, gacha_id) -> int:
     return int((full_state.get(PAID_DRAWS_KEY) or {}).get(str(gacha_id)) or 0)
 
 
+_RARITY_TOTAL_ODDS = {1: 790000, 2: 180000, 3: 30000}
+
+
+def _expanded_permanent_pool(card_type: int) -> list[dict]:
+    """Use the latest featured banner's pool with equal non-pickup odds per
+    rarity so Permanent Scouts (10001/10002) include all released characters
+    and support cards instead of only launch-day ones."""
+    latest = master_data.query_one(
+        "SELECT d.id FROM gacha_data d "
+        "WHERE d.type=3 AND d.card_type=? "
+        "AND EXISTS (SELECT 1 FROM gacha_available a WHERE a.gacha_id=d.id) "
+        "ORDER BY d.id DESC LIMIT 1",
+        (card_type,))
+    if not latest:
+        return []
+    rows = [dict(r) for r in master_data.query(
+        "SELECT card_id, rarity, odds, is_pickup FROM gacha_available WHERE gacha_id=?",
+        (latest["id"],))]
+    by_rarity: dict[int, list[dict]] = {}
+    for r in rows:
+        r["is_pickup"] = 0
+        by_rarity.setdefault(int(r.get("rarity") or 1), []).append(r)
+    for rar, items in by_rarity.items():
+        tot = _RARITY_TOTAL_ODDS.get(rar)
+        if tot and items:
+            base, rem = divmod(tot, len(items))
+            for idx, item in enumerate(items):
+                item["odds"] = base + (1 if idx < rem else 0)
+    return rows
+
+
 def _banner(gacha_id: int) -> dict | None:
     cfg = _banner_config().get(str(gacha_id))
     row = master_data.query_one(
@@ -249,6 +280,8 @@ def _banner(gacha_id: int) -> dict | None:
         return None
     b = dict(row) if row else {}
     pool = (cfg or {}).get("pool")
+    if not pool and gacha_id in (10001, 10002):
+        pool = _expanded_permanent_pool(int(b.get("card_type") or (1 if gacha_id == 10001 else 2)))
     if not pool:
         pool = [dict(r) for r in master_data.query(
             "SELECT card_id, rarity, odds, is_pickup FROM gacha_available WHERE gacha_id=?",

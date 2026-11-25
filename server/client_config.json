@@ -27,7 +27,7 @@
   "_payment": "Carat store -- see app/handlers/payment.py. instant = credit on payment/start and stop before Steam's purchase box; receipt = the real capture flow, credited by payment/finish or payment/dummy; off = catalog only, nothing is ever credited.",
   "payment_mode": "instant",
   "_banner_max_age_days": "gacha/index listing age limit. null = every banner; 30 = only banners still running at some point in the last 30 days (end_date within 30 days of servertime). Open-ended/upcoming banners and gacha_odds.json \"on\": true always stay listed.",
-  "banner_max_age_days": 0,
+  "banner_max_age_days": 30,
   "specialty_priority_bonus": null,
   "hint_rate_multiplier": null,
   "bond_gain_multiplier": null,
